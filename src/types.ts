@@ -57,3 +57,12 @@ export interface ControlCommand {
   timestamp?: string;
   type: "CRITICAL" | "STANDARD";
 }
+
+export interface Waypoint {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  alt: number;
+}
+

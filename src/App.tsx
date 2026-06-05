@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { TelemetryData, ControlCommand } from "./types";
+import { TelemetryData, ControlCommand, Waypoint } from "./types";
 import { LAUNCHPAD_LAT, LAUNCHPAD_LNG } from "./utils/constants";
 
 // Sub-components
@@ -16,6 +16,7 @@ import TrackingMap from "./components/TrackingMap";
 import OrientationVisualization from "./components/OrientationVisualization";
 import VideoStream from "./components/VideoStream";
 import TelemetryConsole from "./components/TelemetryConsole";
+import MissionAnalytics from "./components/MissionAnalytics";
 
 export default function App() {
   // Telemetry stream logs database
@@ -61,6 +62,7 @@ export default function App() {
 
   // Track map coordinates history
   const [mapHistory, setMapHistory] = useState<Array<{ lat: number; lng: number }>>([]);
+  const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
 
   // Generate real-time telemetry stream simulator
   useEffect(() => {
@@ -587,6 +589,7 @@ export default function App() {
                 altitude={current ? current.gpsAlt : 0}
                 gpsSats={current ? current.gpsSats : 0}
                 history={mapHistory}
+                waypoints={waypoints}
               />
             </div>
 
@@ -617,19 +620,37 @@ export default function App() {
               <VideoStream
                 isSeparated={current ? current.state !== "PRE_LAUNCH" && current.state !== "ASCENT" : false}
                 state={current ? current.state : "PRE_LAUNCH"}
+                current={current}
               />
             </div>
           </div>
 
         </div>
+
+        {/* Dynamic High-End Mission Analytics Section */}
+        <div className="mt-3.5">
+          <MissionAnalytics
+            history={history}
+            current={current}
+            waypoints={waypoints}
+            onUpdateWaypoints={setWaypoints}
+          />
+        </div>
       </main>
 
       {/* Professional low-contrast footer */}
-      <footer className="bg-slate-950 border-t border-slate-900 py-3.5 px-4 mt-auto">
-        <div className="max-w-[1600px] mx-auto w-full flex flex-col md:flex-row items-center justify-between gap-2.5 font-mono text-[9px] text-slate-500 tracking-wider">
-          <div className="flex items-center gap-1.5">
+      <footer className="bg-slate-950 border-t border-slate-900 py-4 px-4 mt-auto">
+        <div className="max-w-[1600px] mx-auto w-full flex flex-col md:flex-row items-center justify-between gap-3 font-mono text-[9px] text-slate-500 tracking-wider">
+          <div className="flex flex-wrap items-center gap-2.5">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
             <span>GROUND LOGISTICS CORE LINKED - CANSAT GCS MISSION DEPLOYMENT STATION</span>
+            <span className="text-slate-800">|</span>
+            <div className="flex items-center gap-1.5 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+              <span className="text-slate-600 font-bold uppercase text-[8px]">ENGINEER:</span>
+              <span className="font-sans font-bold text-[9.5px] text-cyan-400 uppercase tracking-widest">
+                ARUNIMA DUTTA
+              </span>
+            </div>
           </div>
           <div>
             <span>SYSTEM UTC SECURE: {new Date().toISOString()}</span>

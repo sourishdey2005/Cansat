@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { GPS_BOUNDS, SPACEX_THEME_COLORS } from "../utils/constants";
+import { Waypoint } from "../types";
 
 interface TrackingMapProps {
   latitude: number;
@@ -12,6 +13,7 @@ interface TrackingMapProps {
   altitude: number;
   gpsSats: number;
   history: Array<{ lat: number; lng: number }>;
+  waypoints?: Waypoint[];
 }
 
 declare const window: any;
@@ -22,11 +24,14 @@ export default function TrackingMap({
   altitude,
   gpsSats,
   history,
+  waypoints,
 }: TrackingMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
   const pathRef = useRef<any>(null);
+  const plannedPathRef = useRef<any>(null);
+  const waypointLayerRef = useRef<any>(null);
   const [isLeafletLoaded, setIsLeafletLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -103,6 +108,17 @@ export default function TrackingMap({
         opacity: 0.9,
         dashArray: "4, 6",
       }).addTo(mapRef.current);
+
+      // Add real planned route waypoints path
+      plannedPathRef.current = L.polyline([], {
+        color: "#c084fc", // Purple-400
+        weight: 2.5,
+        opacity: 0.7,
+        dashArray: "5, 8",
+      }).addTo(mapRef.current);
+
+      // Create LayerGroup for individual waypoint markers
+      waypointLayerRef.current = L.layerGroup().addTo(mapRef.current);
     }
 
     return () => {
@@ -131,7 +147,33 @@ export default function TrackingMap({
       const pathPoints = history.map((item) => [item.lat, item.lng]);
       pathRef.current.setLatLngs(pathPoints);
     }
-  }, [latitude, longitude, history]);
+
+    // Update planned path waypoints
+    if (plannedPathRef.current && waypoints && waypoints.length > 0) {
+      const plannedPoints = waypoints.map((wp) => [wp.lat, wp.lng]);
+      plannedPathRef.current.setLatLngs(plannedPoints);
+    }
+
+    // Update active waypoint markers on leaf map
+    if (waypointLayerRef.current && waypoints) {
+      waypointLayerRef.current.clearLayers();
+      waypoints.forEach((wp, index) => {
+        const wpIcon = L.divIcon({
+          className: "relative",
+          html: `
+            <div class="flex items-center justify-center">
+              <span class="absolute inline-flex h-5 w-5 rounded-full bg-purple-500 opacity-25"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-purple-500 border border-slate-900"></span>
+              <span class="absolute -top-3 bg-slate-950/95 border border-slate-850 text-[7px] font-mono text-purple-300 font-bold px-1.2 py-0.4 rounded shadow whitespace-nowrap">${index + 1}. ${wp.name}</span>
+            </div>
+          `,
+          iconSize: [12, 12],
+          iconAnchor: [6, 6],
+        });
+        L.marker([wp.lat, wp.lng], { icon: wpIcon }).addTo(waypointLayerRef.current);
+      });
+    }
+  }, [latitude, longitude, history, waypoints]);
 
   // Recalculate size when container width/height changes (fits perfectly under our guidelines resizing safety rules)
   useEffect(() => {
