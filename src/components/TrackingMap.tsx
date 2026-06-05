@@ -4,8 +4,9 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { GPS_BOUNDS, SPACEX_THEME_COLORS } from "../utils/constants";
+import { GPS_BOUNDS, SPACEX_THEME_COLORS, LAUNCHPAD_LAT, LAUNCHPAD_LNG } from "../utils/constants";
 import { Waypoint } from "../types";
+import { Target, Navigation, Clock, ShieldAlert } from "lucide-react";
 
 interface TrackingMapProps {
   latitude: number;
@@ -37,6 +38,42 @@ export default function TrackingMap({
   const landingCircleRef = useRef<any>(null);
   const [isLeafletLoaded, setIsLeafletLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // High-precision Haversine distance calculator to launchpad in meters
+  const getHaversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371000; // Radius of the Earth in meters
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  const lpDistance = getHaversineDistance(latitude, longitude, LAUNCHPAD_LAT, LAUNCHPAD_LNG);
+
+  // Calculate ETI (Estimated Time to Impact) based on current altitude and descent rate
+  let etiValue = "STANDBY";
+  if (altitude > 1.5) {
+    if (descentRate > 0.4) {
+      const etiSeconds = altitude / descentRate;
+      if (etiSeconds >= 60) {
+        etiValue = `${Math.floor(etiSeconds / 60)}m ${Math.round(etiSeconds % 60)}s`;
+      } else {
+        etiValue = `${etiSeconds.toFixed(1)}s`;
+      }
+    } else {
+      etiValue = "HOVER / GLIDE";
+    }
+  } else if (altitude <= 1.5 && history.length > 5) {
+    etiValue = "ARRIVED";
+  } else {
+    etiValue = "STANDBY";
+  }
 
   // Dynamically load Leaflet CDN assets to prevent React 19 compilation bugs or asset styling errors
   useEffect(() => {
@@ -284,6 +321,41 @@ export default function TrackingMap({
             <p className="font-mono text-xs text-slate-500 mt-2">Check internet connection. GCS requires OpenStreetMap tile fetching CDN libraries.</p>
           </div>
         )}
+
+        {/* Real-time Summary Metrics overlay */}
+        <div className="absolute bottom-4 left-4 z-[1000] bg-slate-950/90 backdrop-blur border border-slate-800 p-3 rounded-lg shadow-xl w-52 font-mono text-[10px] space-y-2 pointer-events-auto transition-all hover:border-cyan-500/40">
+          <div className="flex items-center gap-1.5 border-b border-slate-800 pb-1.5 text-slate-400 font-bold uppercase tracking-wider text-[8.5px]">
+            <Target className="h-3.5 w-3.5 text-cyan-400 animate-pulse" />
+            <span>DESCENT SITE STATS</span>
+          </div>
+          
+          <div className="space-y-1.5 text-slate-300">
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-slate-500 text-[9px] uppercase text-left">LAUNCHPAD DIST:</span>
+              <span className="text-cyan-400 font-bold text-right">{lpDistance.toFixed(1)} m</span>
+            </div>
+
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-slate-500 text-[9px] uppercase text-left font-semibold">EST IMPACT (ETI):</span>
+              <span className={`font-bold uppercase text-right ${
+                etiValue === "ARRIVED" 
+                  ? "text-emerald-400 animate-pulse" 
+                  : etiValue === "STANDBY" 
+                  ? "text-slate-500" 
+                  : "text-rose-400"
+              }`}>
+                {etiValue}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-slate-500 text-[9px] uppercase text-left">VERTICAL SPEED:</span>
+              <span className={`font-bold text-right ${descentRate > 10 ? "text-yellow-400" : "text-slate-300"}`}>
+                {descentRate.toFixed(1)} m/s
+              </span>
+            </div>
+          </div>
+        </div>
 
         <div ref={mapContainerRef} className="w-full h-full z-10" />
       </div>

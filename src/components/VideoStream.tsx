@@ -30,9 +30,17 @@ export default function VideoStream({ isSeparated, state, current }: VideoProps)
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [hasConsent, setHasConsent] = useState(false);
 
   // Procedural landscape coordinates for simulation scrolling
   const terrainOffsetRef = useRef({ x: 100, y: 100, frame: 0 });
+
+  // Reset consent whenever source changes
+  useEffect(() => {
+    if (source !== "PHYSICAL") {
+      setHasConsent(false);
+    }
+  }, [source]);
 
   // Scan for physical camera devices
   useEffect(() => {
@@ -72,6 +80,7 @@ export default function VideoStream({ isSeparated, state, current }: VideoProps)
       console.error("Camera access failed:", err);
       setCameraError("Camera permission blocked or inaccessible. Please select simulated overlays.");
       setSource("DUE_DRONE"); // Fallback to simulated
+      setHasConsent(false);
     }
   };
 
@@ -96,7 +105,11 @@ export default function VideoStream({ isSeparated, state, current }: VideoProps)
 
   useEffect(() => {
     if (source === "PHYSICAL") {
-      startCamera();
+      if (hasConsent) {
+        startCamera();
+      } else {
+        stopCamera();
+      }
     } else {
       stopCamera();
     }
@@ -105,7 +118,7 @@ export default function VideoStream({ isSeparated, state, current }: VideoProps)
         stream.getTracks().forEach((track) => track.stop());
       }
     };
-  }, [source, selectedDeviceId]);
+  }, [source, selectedDeviceId, hasConsent]);
 
   // Main canvas animation and rendering pipeline (60 FPS)
   useEffect(() => {
@@ -478,6 +491,41 @@ export default function VideoStream({ isSeparated, state, current }: VideoProps)
             className={`w-full h-full max-h-[365px] object-contain select-none transition-all duration-300 ${getFilterCSSClass()}`}
           />
         </div>
+
+        {/* Dynamic User Consent Box for physical web cam permissions */}
+        {source === "PHYSICAL" && !hasConsent && (
+          <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md z-[50] flex flex-col items-center justify-center p-4 text-center">
+            <div className="max-w-md space-y-4 border border-slate-800 bg-slate-900/60 p-5 rounded-lg shadow-2xl relative z-[100] animate-none">
+              <div className="p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-full w-12 h-12 flex items-center justify-center mx-auto text-cyan-400">
+                <Camera className="h-6 w-6 animate-pulse" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-mono text-xs font-bold uppercase tracking-widest text-slate-200">
+                  CAMERA ACCESS PERMISSION REQUEST
+                </h3>
+                <p className="font-mono text-[9px] text-slate-400 leading-normal">
+                  The Ground Control Station requests linkage to your local hardware webcam to display live telemetry overlay and capture telemetry recordings.
+                </p>
+              </div>
+              <div className="flex gap-2 justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSource("DUE_DRONE")}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-750 text-slate-300 font-mono text-[9px] font-bold rounded uppercase cursor-pointer transition-colors"
+                >
+                  CANCEL / DENY
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHasConsent(true)}
+                  className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-mono text-[9px] font-bold rounded uppercase cursor-pointer border border-cyan-500/10 transition-colors"
+                >
+                  AUTHORIZE & LINK
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Live dynamic laser visual marker HUD frame */}
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
