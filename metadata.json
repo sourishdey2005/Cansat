@@ -1,0 +1,6 @@
+{
+  "name": "CanSat Ground Control",
+  "description": "Professional aerospace-style ground control and real-time telemetry monitoring interface for CanSat and CubeSat missions.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
