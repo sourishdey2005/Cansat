@@ -590,6 +590,7 @@ export default function App() {
                 gpsSats={current ? current.gpsSats : 0}
                 history={mapHistory}
                 waypoints={waypoints}
+                descentRate={current ? current.descentRate : 0}
               />
             </div>
 

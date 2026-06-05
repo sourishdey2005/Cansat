@@ -14,6 +14,7 @@ interface TrackingMapProps {
   gpsSats: number;
   history: Array<{ lat: number; lng: number }>;
   waypoints?: Waypoint[];
+  descentRate: number;
 }
 
 declare const window: any;
@@ -25,6 +26,7 @@ export default function TrackingMap({
   gpsSats,
   history,
   waypoints,
+  descentRate,
 }: TrackingMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -32,6 +34,7 @@ export default function TrackingMap({
   const pathRef = useRef<any>(null);
   const plannedPathRef = useRef<any>(null);
   const waypointLayerRef = useRef<any>(null);
+  const landingCircleRef = useRef<any>(null);
   const [isLeafletLoaded, setIsLeafletLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -119,6 +122,16 @@ export default function TrackingMap({
 
       // Create LayerGroup for individual waypoint markers
       waypointLayerRef.current = L.layerGroup().addTo(mapRef.current);
+
+      // Create dynamic projected landing zone prediction circle
+      landingCircleRef.current = L.circle([latitude, longitude], {
+        radius: 0,
+        color: "#f43f5e", // Rose-500
+        fillColor: "#f43f5e",
+        fillOpacity: 0.12,
+        weight: 1.5,
+        dashArray: "3, 6",
+      }).addTo(mapRef.current);
     }
 
     return () => {
@@ -173,7 +186,48 @@ export default function TrackingMap({
         L.marker([wp.lat, wp.lng], { icon: wpIcon }).addTo(waypointLayerRef.current);
       });
     }
-  }, [latitude, longitude, history, waypoints]);
+
+    // Compute dynamic Projected Landing Zone uncertainty circle (radius based on current flight decay vectors)
+    if (landingCircleRef.current) {
+      let radius = 0;
+      if (altitude > 1.5 && descentRate > 0.4) {
+        const remainingTimeSec = altitude / descentRate;
+        // Radial error grows linearly with descent remaining duration at standard offset drift speed (3.2 m/s), 10m base margin
+        radius = remainingTimeSec * 3.2 + 10;
+        // Cap the radius to fit the bounds beautifully
+        radius = Math.max(10, Math.min(800, radius));
+      }
+
+      if (radius > 0) {
+        landingCircleRef.current.setLatLng(newLatLng);
+        landingCircleRef.current.setRadius(radius);
+        landingCircleRef.current.setStyle({
+          color: "#f43f5e",
+          fillColor: "#f43f5e",
+          opacity: 0.8,
+          fillOpacity: 0.12,
+        });
+      } else {
+        // Render a high-precision landing mark if altitude is low
+        if (altitude <= 2) {
+          landingCircleRef.current.setLatLng(newLatLng);
+          landingCircleRef.current.setRadius(5);
+          landingCircleRef.current.setStyle({
+            color: "#10b981", // Emerald success confirmation
+            fillColor: "#10b981",
+            opacity: 0.8,
+            fillOpacity: 0.35,
+          });
+        } else {
+          landingCircleRef.current.setRadius(0);
+          landingCircleRef.current.setStyle({
+            opacity: 0,
+            fillOpacity: 0,
+          });
+        }
+      }
+    }
+  }, [latitude, longitude, altitude, descentRate, history, waypoints]);
 
   // Recalculate size when container width/height changes (fits perfectly under our guidelines resizing safety rules)
   useEffect(() => {
@@ -235,8 +289,8 @@ export default function TrackingMap({
       </div>
 
       {/* Bottom Status Ticker Overlay */}
-      <div className="bg-slate-950/90 border-t border-slate-800 font-mono text-[10px] text-slate-400 px-3 py-2 flex items-center justify-between gap-2 z-10">
-        <div className="flex gap-4">
+      <div className="bg-slate-950/90 border-t border-slate-800 font-mono text-[10px] text-slate-400 px-3 py-2 flex flex-wrap items-center justify-between gap-y-1 z-10">
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
           <div>
             <span className="text-slate-500">LAT:</span> <span className="text-cyan-400 font-bold">{latitude.toFixed(6)}°</span>
           </div>
@@ -246,6 +300,12 @@ export default function TrackingMap({
           <div>
             <span className="text-slate-500">GPS ALT:</span> <span className="text-cyan-400 font-bold">{altitude.toFixed(1)} m</span>
           </div>
+          {altitude > 1.5 && descentRate > 0.4 && (
+            <div className="border-l border-slate-800 pl-3">
+              <span className="text-slate-500 mr-1">PLZ PLOT:</span>
+              <span className="text-rose-400 font-bold">R = {Math.round((altitude / descentRate) * 3.2 + 10)}m</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
