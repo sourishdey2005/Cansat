@@ -67,14 +67,26 @@ export default function VideoStream({ isSeparated, state, current }: VideoProps)
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
-      const constraints: MediaStreamConstraints = {
-        video: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : true,
-      };
-      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      let mediaStream: MediaStream;
+      try {
+        const constraints: MediaStreamConstraints = {
+          video: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : true,
+        };
+        mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (firstErr) {
+        console.warn("Retrying camera with generic constraints, device ID might be stale", firstErr);
+        mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
+      
       setStream(mediaStream);
       setIsCameraActive(true);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch((e) => {
+            console.error("Video element failed to play object stream:", e);
+          });
+        };
       }
     } catch (err: any) {
       console.error("Camera access failed:", err);
@@ -473,13 +485,13 @@ export default function VideoStream({ isSeparated, state, current }: VideoProps)
 
       {/* Video stream rendering center */}
       <div className="flex-1 min-h-[220px] bg-black relative flex items-center justify-center overflow-hidden">
-        {/* Hidden video element for pulling web cam pixels into Canvas */}
+        {/* Invisible video element for pulling web cam pixels into Canvas */}
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
-          className="hidden"
+          style={{ width: "1px", height: "1px", opacity: 0, position: "absolute", pointerEvents: "none" }}
         />
 
         {/* Main interactive responsive high-definition drawing Canvas with Live Filter styles applied */}
