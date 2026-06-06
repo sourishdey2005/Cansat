@@ -1,8 +1,7 @@
 # CanSat Ground Control Station Dashboard
 ### Real-Time Aerospace Telemetry Monitoring System
 
-**Submitted By:** Arunima Dutta
-**Project Domain:** Aerospace Engineering / Embedded Systems / Avionics  
+**Submitted By:** Arunima Dutta 
 **Project Type:** Real-Time Ground Control Software Simulation  
 
 ---
